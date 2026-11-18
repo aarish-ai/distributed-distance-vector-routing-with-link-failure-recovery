@@ -256,6 +256,41 @@ class NetworkLauncherController:
             sock.close()
         return results
 
+    def query_data(self, router: str, timeout: float = 1.0) -> Optional[dict]:
+        """Queries received data packets and forwarding history from router."""
+        if router not in self.router_ports:
+            return None
+        port = self.router_ports[router]
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if hasattr(socket, "SIO_UDP_CONNRESET"):
+            try:
+                sock.ioctl(socket.SIO_UDP_CONNRESET, False)
+            except Exception:
+                pass
+        sock.settimeout(timeout)
+        try:
+            req = json.dumps({"type": MSG_TYPE_CONTROL, "action": "QUERY_DATA"}).encode("utf-8")
+            sock.sendto(req, (self.host, port))
+            deadline = time.time() + timeout
+            while time.time() < deadline:
+                remaining = max(0.01, deadline - time.time())
+                sock.settimeout(remaining)
+                try:
+                    data, _ = sock.recvfrom(65535)
+                except (socket.timeout, TimeoutError):
+                    break
+                except (ConnectionResetError, ConnectionRefusedError, OSError):
+                    break
+                try:
+                    msg = json.loads(data.decode("utf-8"))
+                except Exception:
+                    continue
+                if msg.get("type") == "DATA_RESPONSE" and msg.get("router") == router:
+                    return msg
+            return None
+        finally:
+            sock.close()
+
     def fail_link(self, a: str, b: str) -> None:
         """Sends DROP_LINK control command to router A for B, and to router B for A."""
         if a in self.router_ports:

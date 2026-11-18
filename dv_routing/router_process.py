@@ -293,6 +293,24 @@ class RouterProcess:
                     "dropped_links": dropped,
                 }
                 self.transport.send_json(addr[0], addr[1], resp)
+            elif action in ("QUERY_DATA", "QUERY_RECEIVED"):
+                with self._state_lock:
+                    rcvd = [p.to_dict() for p in self.received_data]
+                    fwds = [
+                        {
+                            "status": r.status,
+                            "next_hop": r.next_hop,
+                            "packet": r.packet.to_dict(),
+                        }
+                        for r in self.forward_history
+                    ]
+                resp = {
+                    "type": "DATA_RESPONSE",
+                    "router": self.name,
+                    "received": rcvd,
+                    "history": fwds,
+                }
+                self.transport.send_json(addr[0], addr[1], resp)
             elif action == "STOP":
                 threading.Thread(target=self.stop, daemon=True).start()
 

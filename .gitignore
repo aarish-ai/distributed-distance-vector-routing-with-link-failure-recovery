@@ -11,4 +11,5 @@ __pycache__/
 .idea/
 .vscode/
 .superpowers/
-logs/
+logs/*
+!logs/*.csv
